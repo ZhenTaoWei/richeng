@@ -241,7 +241,7 @@
                 grid-template-columns: 1fr;
             }
             
-            .datetime-group {
+            .stats {
                 grid-template-columns: 1fr;
             }
         }
@@ -250,13 +250,13 @@
 <body>
     <div class="container">
         <div class="header">
-            <h1>📅 日程提醒助手</h1>
-            <p>智能管理你的时间安排</p>
+            <h1>⏰ 日程提醒助手</h1>
+            <p>让每一天都井然有序</p>
         </div>
 
         <div class="main-content">
             <div class="quick-add">
-                <h2>➕ 快速添加</h2>
+                <h2>➕ 快速添加日程</h2>
                 <form id="quickAddForm">
                     <div class="form-group">
                         <label for="quickDate">日期</label>
@@ -324,7 +324,7 @@
 
             async init() {
                 this.bindEvents();
-                this.setDefaultDate();
+                this.setDefaultDateTime(); // ✅ 修改：设置默认日期和时间
                 await this.loadSchedules();
                 this.startAutoRefresh();
             }
@@ -334,9 +334,26 @@
                 form.addEventListener('submit', (e) => this.handleSubmit(e));
             }
 
-            setDefaultDate() {
-                const today = new Date().toISOString().split('T')[0];
-                document.getElementById('quickDate').value = today;
+            setDefaultDateTime() {
+                // ✅ 修复：使用系统当前日期和时间
+                const now = new Date();
+                
+                // 设置日期为今天
+                const year = now.getFullYear();
+                const month = String(now.getMonth() + 1).padStart(2, '0');
+                const day = String(now.getDate()).padStart(2, '0');
+                document.getElementById('quickDate').value = `${year}-${month}-${day}`;
+                
+                // 设置开始时间为当前时间（向上取整到下一个小时）
+                const currentHour = now.getHours();
+                const nextHour = (currentHour + 1) % 24;
+                const startTime = `${String(nextHour).padStart(2, '0')}:00`;
+                document.getElementById('quickStartTime').value = startTime;
+                
+                // 设置结束时间为开始时间+1小时
+                const endHour = (nextHour + 1) % 24;
+                const endTime = `${String(endHour).padStart(2, '0')}:00`;
+                document.getElementById('quickEndTime').value = endTime;
             }
 
             async loadSchedules() {
@@ -375,7 +392,7 @@
                 if (result.success) {
                     alert('日程添加成功！');
                     document.getElementById('quickAddForm').reset();
-                    this.setDefaultDate();
+                    this.setDefaultDateTime();
                     await this.loadSchedules();
                 }
             }
@@ -432,7 +449,7 @@
                 const currentTime = now.toTimeString().slice(0, 5);
                 
                 return this.schedules.filter(schedule => {
-                    if (schedule.completed) return false;
+                    if (schedule.completed) return false; // ✅ 排除已完成的日程
                     
                     const scheduleDateTime = new Date(`${schedule.date}T${schedule.startTime}`);
                     const timeDiff = scheduleDateTime - now;
@@ -457,10 +474,13 @@
 
             updateStats() {
                 const today = new Date().toISOString().split('T')[0];
-                const todaySchedules = this.schedules.filter(s => s.date === today);
+                
+                // ✅ 修复：统计时排除已完成的日程
+                const activeSchedules = this.schedules.filter(s => !s.completed);
+                const todaySchedules = activeSchedules.filter(s => s.date === today);
                 const upcomingSchedules = this.getUpcomingSchedules();
 
-                document.getElementById('totalCount').textContent = this.schedules.length;
+                document.getElementById('totalCount').textContent = activeSchedules.length;
                 document.getElementById('todayCount').textContent = todaySchedules.length;
                 document.getElementById('upcomingCount').textContent = upcomingSchedules.length;
             }
@@ -503,7 +523,7 @@
                 const [hours, minutes] = timeString.split(':');
                 const hour = parseInt(hours);
                 const period = hour >= 12 ? '下午' : '上午';
-                const displayHour = hour > 12 ? hour - 12 : hour;
+                const displayHour = hour > 12 ? hour - 12 : (hour === 0 ? 12 : hour);
                 return `${period}${displayHour}:${minutes}`;
             }
 
