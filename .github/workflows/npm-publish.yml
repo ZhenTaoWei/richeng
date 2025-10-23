@@ -25,7 +25,7 @@ jobs:
           # cache: npm
 
       - name: Install dependencies
-        run: npm ci
+        run: npm install
         env:
           # 使用环境变量指定镜像，避免 npm config 报错
           ELECTRON_MIRROR: https://npmmirror.com/mirrors/electron/
