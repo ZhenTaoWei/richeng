@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>添加日程</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', 'Microsoft YaHei', sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: #f8f9fa;
+        }
+
+        .container {
+            max-width: 500px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 15px;
+            padding: 30px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+        }
+
+        h2 {
+            color: #333;
+            margin-bottom: 25px;
+            text-align: center;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            color: #555;
+            font-weight: 500;
+        }
+
+        .form-group input, .form-group textarea {
+            width: 100%;
+            padding: 12px 15px;
+            border: 2px solid #e0e0e0;
+            border-radius: 10px;
+            font-size: 1em;
+            transition: all 0.3s ease;
+        }
+
+        .form-group input:focus, .form-group textarea:focus {
+            outline: none;
+            border-color: #4facfe;
+            box-shadow: 0 0 0 3px rgba(79, 172, 254, 0.1);
+        }
+
+        .datetime-group {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+        }
+
+        .btn {
+            background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            border-radius: 10px;
+            font-size: 1.1em;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            width: 100%;
+            margin-top: 10px;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(79, 172, 254, 0.3);
+        }
+
+        .btn-close {
+            background: #6c757d;
+            margin-top: 10px;
+        }
+
+        .conflict-warning {
+            background: #fff3cd;
+            border: 1px solid #ffeaa7;
+            color: #856404;
+            padding: 15px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h2>➕ 添加新日程</h2>
+        
+        <div class="conflict-warning" id="conflictWarning">
+            <strong>⚠️ 时间冲突警告：</strong>
+            <div id="conflictDetails"></div>
+        </div>
+
+        <form id="scheduleForm">
+            <div class="form-group">
+                <label for="scheduleDate">日期</label>
+                <input type="date" id="scheduleDate" required>
+            </div>
+            
+            <div class="datetime-group">
+                <div class="form-group">
+                    <label for="startTime">开始时间</label>
+                    <input type="time" id="startTime" required>
+                </div>
+                
+                <div class="form-group">
+                    <label for="endTime">结束时间</label>
+                    <input type="time" id="endTime" required>
+                </div>
+            </div>
+            
+            <div class="form-group">
+                <label for="scheduleContent">事项内容</label>
+                <textarea id="scheduleContent" rows="4" placeholder="请输入具体事项..." required></textarea>
+            </div>
+            
+            <button type="submit" class="btn">添加日程</button>
+            <button type="button" class="btn btn-close" onclick="window.close()">取消</button>
+        </form>
+    </div>
+
+    <script>
+        const { ipcRenderer } = require('electron');
+
+        class ScheduleForm {
+            constructor() {
+                this.schedules = [];
+                this.init();
+            }
+
+            async init() {
+                await this.loadSchedules();
+                this.bindEvents();
+                this.setDefaultDate();
+            }
+
+            async loadSchedules() {
+                this.schedules = await ipcRenderer.invoke('get-schedules');
+            }
+
+            bindEvents() {
+                const form = document.getElementById('scheduleForm');
+                form.addEventListener('submit', (e) => this.handleSubmit(e));
+
+                // 实时检查冲突
+                ['scheduleDate', 'startTime', 'endTime'].forEach(id => {
+                    document.getElementById(id).addEventListener('change', () => this.checkConflict());
+                });
+            }
+
+            setDefaultDate() {
+                const today = new Date().toISOString().split('T')[0];
+                document.getElementById('scheduleDate').value = today;
+            }
+
+            async handleSubmit(e) {
+                e.preventDefault();
+                
+                const formData = {
+                    id: Date.now(),
+                    date: document.getElementById('scheduleDate').value,
+                    startTime: document.getElementById('startTime').value,
+                    endTime: document.getElementById('endTime').value,
+                    content: document.getElementById('scheduleContent').value.trim(),
+                    completed: false,
+                    createdAt: new Date().toISOString()
+                };
+
+                if (formData.startTime >= formData.endTime) {
+                    alert('结束时间必须晚于开始时间！');
+                    return;
+                }
+
+                const result = await ipcRenderer.invoke('add-schedule', formData);
+                
+                if (result.success) {
+                    alert('日程添加成功！');
+                    window.close();
+                }
+            }
+
+            checkConflict() {
+                const date = document.getElementById('scheduleDate').value;
+                const startTime = document.getElementById('startTime').value;
+                const endTime = document.getElementById('endTime').value;
+                
+                if (!date || !startTime || !endTime) return;
+
+                const conflicts = this.schedules.filter(schedule => {
+                    if (schedule.date !== date) return false;
+                    if (schedule.completed) return false;
+                    
+                    return (startTime < schedule.endTime && endTime > schedule.startTime);
+                });
+
+                const warningDiv = document.getElementById('conflictWarning');
+                const detailsDiv = document.getElementById('conflictDetails');
+                
+                if (conflicts.length > 0) {
+                    detailsDiv.innerHTML = conflicts.map(c => 
+                        `• ${this.formatTime(c.startTime)}-${this.formatTime(c.endTime)}: ${c.content}`
+                    ).join('<br>');
+                    warningDiv.style.display = 'block';
+                } else {
+                    warningDiv.style.display = 'none';
+                }
+            }
+
+            formatTime(timeString) {
+                const [hours, minutes] = timeString.split(':');
+                const hour = parseInt(hours);
+                const period = hour >= 12 ? '下午' : '上午';
+                const displayHour = hour > 12 ? hour - 12 : hour;
+                return `${period}${displayHour}:${minutes}`;
+            }
+        }
+
+        const form = new ScheduleForm();
+    </script>
+</body>
+</html>
