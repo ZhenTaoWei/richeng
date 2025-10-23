@@ -142,7 +142,7 @@
             async init() {
                 await this.loadSchedules();
                 this.bindEvents();
-                this.setDefaultDate();
+                this.setDefaultDateTime(); // ✅ 修改：设置默认日期和时间
             }
 
             async loadSchedules() {
@@ -159,9 +159,26 @@
                 });
             }
 
-            setDefaultDate() {
-                const today = new Date().toISOString().split('T')[0];
-                document.getElementById('scheduleDate').value = today;
+            setDefaultDateTime() {
+                // ✅ 修复：使用系统当前日期和时间
+                const now = new Date();
+                
+                // 设置日期为今天
+                const year = now.getFullYear();
+                const month = String(now.getMonth() + 1).padStart(2, '0');
+                const day = String(now.getDate()).padStart(2, '0');
+                document.getElementById('scheduleDate').value = `${year}-${month}-${day}`;
+                
+                // 设置开始时间为当前时间（向上取整到下一个小时）
+                const currentHour = now.getHours();
+                const nextHour = currentHour + 1;
+                const startTime = `${String(nextHour).padStart(2, '0')}:00`;
+                document.getElementById('startTime').value = startTime;
+                
+                // 设置结束时间为开始时间+1小时
+                const endHour = nextHour + 1;
+                const endTime = `${String(endHour).padStart(2, '0')}:00`;
+                document.getElementById('endTime').value = endTime;
             }
 
             async handleSubmit(e) {
@@ -197,9 +214,10 @@
                 
                 if (!date || !startTime || !endTime) return;
 
+                // ✅ 修改：过滤时只考虑未完成的日程
                 const conflicts = this.schedules.filter(schedule => {
                     if (schedule.date !== date) return false;
-                    if (schedule.completed) return false;
+                    if (schedule.completed) return false; // ✅ 排除已完成的日程
                     
                     return (startTime < schedule.endTime && endTime > schedule.startTime);
                 });
@@ -221,7 +239,7 @@
                 const [hours, minutes] = timeString.split(':');
                 const hour = parseInt(hours);
                 const period = hour >= 12 ? '下午' : '上午';
-                const displayHour = hour > 12 ? hour - 12 : hour;
+                const displayHour = hour > 12 ? hour - 12 : (hour === 0 ? 12 : hour);
                 return `${period}${displayHour}:${minutes}`;
             }
         }
