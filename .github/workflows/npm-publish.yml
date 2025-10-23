@@ -6,6 +6,7 @@ name: Build & Release Electron App
 on:
   release:
     types: [created]   # 在 GitHub 发布页新建 release 时触发
+  workflow_dispatch:
 
 jobs:
   build:
