@@ -1,11 +1,11 @@
-const { app, BrowserWindow, ipcMain, Notification, dialog } = require('electron');
+const { app, BrowserWindow, ipcMain, Notification, dialog, Menu, Tray } = require('electron');
 const path = require('path');
-const { autoUpdater } = require('electron-updater');
+const fs = require('fs');
 
 let mainWindow;
 let scheduleWindow;
-let tray; // 添加 tray 变量
-let isQuitting = false; // 添加标志位
+let tray;
+let isQuitting = false;
 
 function createWindow() {
     mainWindow = new BrowserWindow({
@@ -23,9 +23,6 @@ function createWindow() {
 
     mainWindow.once('ready-to-show', () => {
         mainWindow.show();
-        
-        // 检查更新
-        autoUpdater.checkForUpdatesAndNotify();
     });
 
     // 关闭窗口时隐藏而不是退出
@@ -52,9 +49,15 @@ function createWindow() {
 }
 
 function createTray() {
-    const { Menu, Tray } = require('electron');
+    const trayIconPath = path.join(__dirname, 'assets/tray-icon.png');
     
-    tray = new Tray(path.join(__dirname, 'assets/tray-icon.png'));
+    // 如果图标文件不存在，跳过托盘创建
+    if (!fs.existsSync(trayIconPath)) {
+        console.log('托盘图标文件不存在，跳过托盘创建');
+        return;
+    }
+    
+    tray = new Tray(trayIconPath);
     
     const contextMenu = Menu.buildFromTemplate([
         {
@@ -133,7 +136,6 @@ class ScheduleReminder {
     }
 
     loadSchedules() {
-        const fs = require('fs');
         const dataPath = path.join(app.getPath('userData'), 'schedules.json');
         
         try {
@@ -148,7 +150,6 @@ class ScheduleReminder {
     }
 
     saveSchedules() {
-        const fs = require('fs');
         const dataPath = path.join(app.getPath('userData'), 'schedules.json');
         
         try {
@@ -231,7 +232,6 @@ class ScheduleReminder {
         const notification = new Notification({
             title: isRepeat ? '⏰ 日程提醒（重复）' : '⏰ 日程提醒',
             body: `${schedule.content}\n时间: ${this.formatTime(schedule.startTime)} - ${this.formatTime(schedule.endTime)}`,
-            icon: path.join(__dirname, 'assets/reminder-icon.png'),
             silent: false,
             timeoutType: 'never'
         });
@@ -318,37 +318,6 @@ ipcMain.handle('get-upcoming-schedules', () => {
     return reminder.getUpcomingSchedules();
 });
 
-// 自动更新
-autoUpdater.on('update-available', () => {
-    if (mainWindow) {
-        dialog.showMessageBox(mainWindow, {
-            type: 'info',
-            title: '发现新版本',
-            message: '发现新版本，是否现在更新？',
-            buttons: ['是', '否']
-        }).then((result) => {
-            if (result.response === 0) {
-                autoUpdater.downloadUpdate();
-            }
-        });
-    }
-});
-
-autoUpdater.on('update-downloaded', () => {
-    if (mainWindow) {
-        dialog.showMessageBox(mainWindow, {
-            type: 'info',
-            title: '更新就绪',
-            message: '更新已下载完成，是否现在重启应用？',
-            buttons: ['是', '否']
-        }).then((result) => {
-            if (result.response === 0) {
-                autoUpdater.quitAndInstall();
-            }
-        });
-    }
-});
-
 app.whenReady().then(createWindow);
 
 // macOS 特殊处理：点击 Dock 图标时显示窗口
@@ -360,10 +329,9 @@ app.on('activate', () => {
     }
 });
 
-// 关键修复：阻止应用在关闭所有窗口时退出
-app.on('window-all-closed', (event) => {
+// 保持应用在后台运行
+app.on('window-all-closed', () => {
     // 不做任何事，保持应用运行
-    // Windows 和 Linux 上也保持后台运行
 });
 
 // 真正退出前的处理
