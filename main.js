@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, Notification, dialog, Menu, Tray } = require('electron');
+const { app, BrowserWindow, ipcMain, Notification, dialog, Menu, Tray, nativeImage } = require('electron');
 const path = require('path');
 const fs = require('fs');
 
@@ -49,15 +49,39 @@ function createWindow() {
 }
 
 function createTray() {
-    const trayIconPath = path.join(__dirname, 'assets/tray-icon.png');
+    // 尝试多个图标路径（优先级从高到低）
+    const iconPaths = [
+        path.join(__dirname, 'assets/tray-icon.png'),     // 专用托盘图标
+        path.join(__dirname, 'assets/icon.png'),          // 应用图标（备用）
+        path.join(process.resourcesPath, 'assets/icon.png') // 打包后路径
+    ];
     
-    // 如果图标文件不存在，跳过托盘创建
-    if (!fs.existsSync(trayIconPath)) {
-        console.log('托盘图标文件不存在，跳过托盘创建');
+    let iconPath = null;
+    for (const p of iconPaths) {
+        if (fs.existsSync(p)) {
+            iconPath = p;
+            console.log('使用图标:', p);
+            break;
+        }
+    }
+    
+    if (!iconPath) {
+        console.error('❌ 找不到任何图标文件，托盘功能将不可用');
+        console.error('请确保以下任一文件存在：');
+        iconPaths.forEach(p => console.error('  -', p));
         return;
     }
     
-    tray = new Tray(trayIconPath);
+    // 加载图标并调整大小（适配托盘显示）
+    let icon = nativeImage.createFromPath(iconPath);
+    
+    // 如果图标太大，缩小到托盘合适的尺寸
+    const size = icon.getSize();
+    if (size.width > 32 || size.height > 32) {
+        icon = icon.resize({ width: 16, height: 16 });
+    }
+    
+    tray = new Tray(icon);
     
     const contextMenu = Menu.buildFromTemplate([
         {
@@ -100,6 +124,8 @@ function createTray() {
             }
         }
     });
+    
+    console.log('✅ 托盘图标创建成功');
 }
 
 function createScheduleWindow() {
