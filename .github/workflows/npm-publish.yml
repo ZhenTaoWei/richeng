@@ -4,14 +4,14 @@
 name: Build Windows Installer
 
 on:
-  workflow_dispatch:       # ← 允许 GitHub 网页手动触发
+  workflow_dispatch:   # 手动触发
   push:
     tags:
-      - 'v*'               # ← 推送 v1.0.0 之类标签时自动构建
+      - 'v*'           # 推送 v1.0.0 等标签时自动构建
 
 jobs:
   build-win:
-    runs-on: windows-latest   # ← 只跑 Windows 环境
+    runs-on: windows-latest
 
     steps:
       - name: Checkout
@@ -21,24 +21,23 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 20
+          # 若你有 lock 文件可取消注释下一行
           # cache: npm
 
       - name: Install dependencies
-        run: npm install
-
-      # 国内镜像加速（防止 Electron 下载超时）
-      - name: Set China mirror
-        run: |
-          npm config set electron_mirror https://npmmirror.com/mirrors/electron/
-          npm config set electron_builder_binaries_mirror https://npmmirror.com/mirrors/electron-builder-binaries/
+        run: npm ci
+        env:
+          # 使用环境变量指定镜像，避免 npm config 报错
+          ELECTRON_MIRROR: https://npmmirror.com/mirrors/electron/
+          ELECTRON_BUILDER_BINARIES_MIRROR: https://npmmirror.com/mirrors/electron-builder-binaries/
 
       - name: Build Windows installer
         run: npm run build:win
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Upload artifacts
+      - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: win-installer
-          path: dist/*.exe          # 安装包
+          path: dist/*.exe
