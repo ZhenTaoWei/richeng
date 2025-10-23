@@ -1,9 +1,10 @@
-const { app, BrowserWindow, ipcMain, Notification, dialog } = require('electron');
+const { app, BrowserWindow, ipcMain, Notification, dialog, Menu, Tray } = require('electron');
 const path = require('path');
-const { autoUpdater } = require('electron-updater');
+const fs = require('fs');
 
 let mainWindow;
 let scheduleWindow;
+let tray;
 
 function createWindow() {
     mainWindow = new BrowserWindow({
@@ -21,9 +22,6 @@ function createWindow() {
 
     mainWindow.once('ready-to-show', () => {
         mainWindow.show();
-        
-        // 检查更新
-        autoUpdater.checkForUpdatesAndNotify();
     });
 
     mainWindow.on('closed', () => {
@@ -41,15 +39,23 @@ function createWindow() {
 }
 
 function createTray() {
-    const { Menu, Tray } = require('electron');
+    const trayIconPath = path.join(__dirname, 'assets/tray-icon.png');
     
-    const tray = new Tray(path.join(__dirname, 'assets/tray-icon.png'));
+    // 如果图标文件不存在，使用默认图标
+    if (!fs.existsSync(trayIconPath)) {
+        console.log('托盘图标文件不存在，跳过托盘创建');
+        return;
+    }
+    
+    tray = new Tray(trayIconPath);
     
     const contextMenu = Menu.buildFromTemplate([
         {
             label: '显示主窗口',
             click: () => {
-                mainWindow.show();
+                if (mainWindow) {
+                    mainWindow.show();
+                }
             }
         },
         {
@@ -64,6 +70,7 @@ function createTray() {
         {
             label: '退出',
             click: () => {
+                app.isQuitting = true;
                 app.quit();
             }
         }
@@ -73,7 +80,9 @@ function createTray() {
     tray.setContextMenu(contextMenu);
     
     tray.on('click', () => {
-        mainWindow.show();
+        if (mainWindow) {
+            mainWindow.show();
+        }
     });
 }
 
@@ -111,7 +120,6 @@ class ScheduleReminder {
     }
 
     loadSchedules() {
-        const fs = require('fs');
         const dataPath = path.join(app.getPath('userData'), 'schedules.json');
         
         try {
@@ -126,7 +134,6 @@ class ScheduleReminder {
     }
 
     saveSchedules() {
-        const fs = require('fs');
         const dataPath = path.join(app.getPath('userData'), 'schedules.json');
         
         try {
@@ -209,14 +216,15 @@ class ScheduleReminder {
         const notification = new Notification({
             title: isRepeat ? '⏰ 日程提醒（重复）' : '⏰ 日程提醒',
             body: `${schedule.content}\n时间: ${this.formatTime(schedule.startTime)} - ${this.formatTime(schedule.endTime)}`,
-            icon: path.join(__dirname, 'assets/reminder-icon.png'),
             silent: false,
             timeoutType: 'never'
         });
 
         notification.on('click', () => {
-            mainWindow.show();
-            mainWindow.focus();
+            if (mainWindow) {
+                mainWindow.show();
+                mainWindow.focus();
+            }
         });
 
         notification.show();
@@ -294,33 +302,6 @@ ipcMain.handle('get-upcoming-schedules', () => {
     return reminder.getUpcomingSchedules();
 });
 
-// 自动更新
-autoUpdater.on('update-available', () => {
-    dialog.showMessageBox(mainWindow, {
-        type: 'info',
-        title: '发现新版本',
-        message: '发现新版本，是否现在更新？',
-        buttons: ['是', '否']
-    }).then((result) => {
-        if (result.response === 0) {
-            autoUpdater.downloadUpdate();
-        }
-    });
-});
-
-autoUpdater.on('update-downloaded', () => {
-    dialog.showMessageBox(mainWindow, {
-        type: 'info',
-        title: '更新就绪',
-        message: '更新已下载完成，是否现在重启应用？',
-        buttons: ['是', '否']
-    }).then((result) => {
-        if (result.response === 0) {
-            autoUpdater.quitAndInstall();
-        }
-    });
-});
-
 app.whenReady().then(createWindow);
 
 app.on('window-all-closed', () => {
@@ -335,10 +316,15 @@ app.on('activate', () => {
     }
 });
 
-// 防止应用退出，保持后台运行
-app.on('before-quit', (event) => {
-    if (mainWindow) {
-        event.preventDefault();
-        mainWindow.hide();
+// 防止应用退出时关闭窗口
+app.on('before-quit', () => {
+    app.isQuitting = true;
+});
+
+app.on('window-all-closed', () => {
+    if (!app.isQuitting) {
+        // 不退出应用，保持在后台
+    } else {
+        app.quit();
     }
 });
