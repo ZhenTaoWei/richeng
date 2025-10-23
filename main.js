@@ -1,10 +1,11 @@
-const { app, BrowserWindow, ipcMain, Notification, dialog, Menu, Tray } = require('electron');
+const { app, BrowserWindow, ipcMain, Notification, dialog } = require('electron');
 const path = require('path');
-const fs = require('fs');
+const { autoUpdater } = require('electron-updater');
 
 let mainWindow;
 let scheduleWindow;
-let tray;
+let tray; // 添加 tray 变量
+let isQuitting = false; // 添加标志位
 
 function createWindow() {
     mainWindow = new BrowserWindow({
@@ -22,6 +23,18 @@ function createWindow() {
 
     mainWindow.once('ready-to-show', () => {
         mainWindow.show();
+        
+        // 检查更新
+        autoUpdater.checkForUpdatesAndNotify();
+    });
+
+    // 关闭窗口时隐藏而不是退出
+    mainWindow.on('close', (event) => {
+        if (!isQuitting) {
+            event.preventDefault();
+            mainWindow.hide();
+            return false;
+        }
     });
 
     mainWindow.on('closed', () => {
@@ -39,15 +52,9 @@ function createWindow() {
 }
 
 function createTray() {
-    const trayIconPath = path.join(__dirname, 'assets/tray-icon.png');
+    const { Menu, Tray } = require('electron');
     
-    // 如果图标文件不存在，使用默认图标
-    if (!fs.existsSync(trayIconPath)) {
-        console.log('托盘图标文件不存在，跳过托盘创建');
-        return;
-    }
-    
-    tray = new Tray(trayIconPath);
+    tray = new Tray(path.join(__dirname, 'assets/tray-icon.png'));
     
     const contextMenu = Menu.buildFromTemplate([
         {
@@ -55,6 +62,7 @@ function createTray() {
             click: () => {
                 if (mainWindow) {
                     mainWindow.show();
+                    mainWindow.focus();
                 }
             }
         },
@@ -70,7 +78,7 @@ function createTray() {
         {
             label: '退出',
             click: () => {
-                app.isQuitting = true;
+                isQuitting = true;
                 app.quit();
             }
         }
@@ -81,7 +89,12 @@ function createTray() {
     
     tray.on('click', () => {
         if (mainWindow) {
-            mainWindow.show();
+            if (mainWindow.isVisible()) {
+                mainWindow.hide();
+            } else {
+                mainWindow.show();
+                mainWindow.focus();
+            }
         }
     });
 }
@@ -120,6 +133,7 @@ class ScheduleReminder {
     }
 
     loadSchedules() {
+        const fs = require('fs');
         const dataPath = path.join(app.getPath('userData'), 'schedules.json');
         
         try {
@@ -134,6 +148,7 @@ class ScheduleReminder {
     }
 
     saveSchedules() {
+        const fs = require('fs');
         const dataPath = path.join(app.getPath('userData'), 'schedules.json');
         
         try {
@@ -216,6 +231,7 @@ class ScheduleReminder {
         const notification = new Notification({
             title: isRepeat ? '⏰ 日程提醒（重复）' : '⏰ 日程提醒',
             body: `${schedule.content}\n时间: ${this.formatTime(schedule.startTime)} - ${this.formatTime(schedule.endTime)}`,
+            icon: path.join(__dirname, 'assets/reminder-icon.png'),
             silent: false,
             timeoutType: 'never'
         });
@@ -302,29 +318,55 @@ ipcMain.handle('get-upcoming-schedules', () => {
     return reminder.getUpcomingSchedules();
 });
 
-app.whenReady().then(createWindow);
-
-app.on('window-all-closed', () => {
-    if (process.platform !== 'darwin') {
-        app.quit();
+// 自动更新
+autoUpdater.on('update-available', () => {
+    if (mainWindow) {
+        dialog.showMessageBox(mainWindow, {
+            type: 'info',
+            title: '发现新版本',
+            message: '发现新版本，是否现在更新？',
+            buttons: ['是', '否']
+        }).then((result) => {
+            if (result.response === 0) {
+                autoUpdater.downloadUpdate();
+            }
+        });
     }
 });
 
+autoUpdater.on('update-downloaded', () => {
+    if (mainWindow) {
+        dialog.showMessageBox(mainWindow, {
+            type: 'info',
+            title: '更新就绪',
+            message: '更新已下载完成，是否现在重启应用？',
+            buttons: ['是', '否']
+        }).then((result) => {
+            if (result.response === 0) {
+                autoUpdater.quitAndInstall();
+            }
+        });
+    }
+});
+
+app.whenReady().then(createWindow);
+
+// macOS 特殊处理：点击 Dock 图标时显示窗口
 app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {
         createWindow();
+    } else if (mainWindow) {
+        mainWindow.show();
     }
 });
 
-// 防止应用退出时关闭窗口
+// 关键修复：阻止应用在关闭所有窗口时退出
+app.on('window-all-closed', (event) => {
+    // 不做任何事，保持应用运行
+    // Windows 和 Linux 上也保持后台运行
+});
+
+// 真正退出前的处理
 app.on('before-quit', () => {
-    app.isQuitting = true;
-});
-
-app.on('window-all-closed', () => {
-    if (!app.isQuitting) {
-        // 不退出应用，保持在后台
-    } else {
-        app.quit();
-    }
+    isQuitting = true;
 });
