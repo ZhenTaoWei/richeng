@@ -34,8 +34,10 @@
     },
     "files": [
       "**/*",
-      "!dist/**/*",
-      "!node_modules/**/*"
+      "!dist/**/*"
+    ],
+    "asarUnpack": [
+      "node_modules/electron-updater/**/*"
     ],
     "win": {
       "target": "nsis",
