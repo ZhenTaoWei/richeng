@@ -58,7 +58,7 @@ function createTray() {
       type: 'info',
       title: '调试图标路径',
       message: '调试图标路径信息：',
-      detail: `尝试的路径：\n${iconPath.join('\n')}`
+      detail: `尝试的路径：\n${iconPath}`
     });
     
     // 如果找不到图标，创建一个简单的图标（避免托盘功能完全失效）
@@ -408,6 +408,7 @@ app.on('window-all-closed', () => {
 app.on('before-quit', () => {
     isQuitting = true;
 });
+
 
 
 
