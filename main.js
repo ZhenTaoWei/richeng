@@ -41,7 +41,7 @@ function createWindow() {
     // 最小化到系统托盘
     mainWindow.on('minimize', (event) => {
         event.preventDefault();
-        mainWindow.hide();
+        mainWindow.minimize();
     });
 
     // 创建系统托盘
@@ -413,7 +413,28 @@ ipcMain.handle('get-upcoming-schedules', () => {
     return reminder.getUpcomingSchedules();
 });
 
-app.whenReady().then(createWindow);
+app.setLoginItemSettings({
+    openAtLogin: true,   // 开机自启
+    path: process.execPath,
+    args: ['--hidden'],
+});
+
+// app.whenReady().then(createWindow);
+app.whenReady().then(() => {
+    const startHidden = process.argv.includes('--hidden');
+    createWindow();
+
+    if (startHidden) {
+        // ✅ 开机自启时静默启动在托盘中
+        mainWindow.hide();
+    } else {
+        mainWindow.show();
+    }
+
+    app.on('activate', () => {
+        if (BrowserWindow.getAllWindows().length === 0) createWindow();
+    });
+});
 
 // macOS 特殊处理：点击 Dock 图标时显示窗口
 app.on('activate', () => {
@@ -433,3 +454,4 @@ app.on('window-all-closed', () => {
 app.on('before-quit', () => {
     isQuitting = true;
 });
+
