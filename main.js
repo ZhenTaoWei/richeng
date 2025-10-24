@@ -86,29 +86,15 @@ function createTray() {
     // 调整图标大小以适配托盘
     if (!icon.isEmpty()) {
         const size = icon.getSize();
-        if (process.platform === 'darwin') {
-            // macOS 托盘图标建议 16x16 或 22x22
-            if (size.width > 22 || size.height > 22) {
-                icon = icon.resize({ width: 22, height: 22 });
-                console.log('📏 图标已调整为 22x22 (macOS)');
-            }
-        } else if (process.platform === 'win32') {
-            // Windows 托盘图标建议 16x16
-            if (size.width !== 16 || size.height !== 16) {
-                icon = icon.resize({ width: 16, height: 16 });
-                console.log('📏 图标已调整为 16x16 (Windows)');
-            }
-        } else {
-            // Linux 根据实际情况调整
-            if (size.width > 24 || size.height > 24) {
-                icon = icon.resize({ width: 24, height: 24 });
-                console.log('📏 图标已调整为 24x24 (Linux)');
-            }
+        // Windows 托盘图标建议 16x16
+        if (size.width !== 16 || size.height !== 16) {
+            icon = icon.resize({ width: 16, height: 16 });
+            console.log('📏 图标已调整为 16x16 (Windows)');
         }
     }
     
     try {
-        tray = new Tray(icon);
+        tray = new Tray(iconPath);
         console.log('✅ 系统托盘创建成功');
     } catch (error) {
         console.error('❌ 创建系统托盘失败:', error);
