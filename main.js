@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, Notification, dialog, Menu, Tray, nativeImage } = require('electron');
+const { app, BrowserWindow, ipcMain, Notification, dialog, Menu, Tray, nativeImage, dialog } = require('electron');
 const path = require('path');
 const fs = require('fs');
 
@@ -54,12 +54,11 @@ function createTray() {
     let iconPath = null;
     iconPath = path.join(__dirname, 'assets/icon.ico');
     icon = nativeImage.createFromPath(iconPath);
+    dialog.showErrorBox('图标加载失败', `未能从以下路径加载托盘图标：\n${iconPath}`);
     
     // 如果找不到图标，创建一个简单的图标（避免托盘功能完全失效）
     if (!icon || icon.isEmpty()) {
-        console.error('❌ 未找到任何可用图标文件');
-        console.error('请确保以下任一文件存在：');
-        iconPaths.forEach(p => console.error('  -', p));
+        dialog.showErrorBox('图标加载失败', '进入备用图标');
         
         // 尝试创建一个临时图标文件
         try {
@@ -79,6 +78,7 @@ function createTray() {
         } catch (err) {
             // 如果创建临时图标也失败，使用空图标
             icon = nativeImage.createEmpty();
+            dialog.showErrorBox('图标加载失败', '临时图标失败');
             console.warn('⚠️ 使用空图标创建托盘（图标可能不可见）');
         }
     }
@@ -94,10 +94,10 @@ function createTray() {
     }
     
     try {
-        tray = new Tray(iconPath);
+        tray = new Tray(icon);
         console.log('✅ 系统托盘创建成功');
     } catch (error) {
-        console.error('❌ 创建系统托盘失败:', error);
+        dialog.showErrorBox('图标加载失败', 'New方法失败');
         return;
     }
     
@@ -403,6 +403,7 @@ app.on('window-all-closed', () => {
 app.on('before-quit', () => {
     isQuitting = true;
 });
+
 
 
 
