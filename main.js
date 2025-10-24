@@ -15,7 +15,7 @@ function createWindow() {
             nodeIntegration: true,
             contextIsolation: false
         },
-        icon: path.join(__dirname, 'assets/icon.png'),
+        icon: path.join(__dirname, 'assets/icon.ico'),
         show: false
     });
 
@@ -52,7 +52,7 @@ function createTray() {
     
     let icon = null;
     let iconPath = null;
-    iconPath = path.join(__dirname, 'assets/icon.png');
+    iconPath = path.join(__dirname, 'assets/icon.ico');
     icon = nativeImage.createFromPath(iconPath);
     
     // 如果找不到图标，创建一个简单的图标（避免托盘功能完全失效）
@@ -403,5 +403,6 @@ app.on('window-all-closed', () => {
 app.on('before-quit', () => {
     isQuitting = true;
 });
+
 
 
