@@ -52,7 +52,8 @@ function createTray() {
     
     let icon = null;
     let iconPath = null;
-    iconPath = path.join(__dirname, 'assets/icon.ico');
+    // iconPath = path.join(__dirname, 'assets/icon.ico');
+    iconPath = path.join(process.resourcesPath, 'assets/icon.ico');
     icon = nativeImage.createFromPath(iconPath);
     dialog.showMessageBox({
       type: 'info',
@@ -408,6 +409,7 @@ app.on('window-all-closed', () => {
 app.on('before-quit', () => {
     isQuitting = true;
 });
+
 
 
 
