@@ -49,48 +49,11 @@ function createWindow() {
 }
 
 function createTray() {
-    // 根据平台选择合适的图标格式和路径
-    const iconPaths = [];
-    
-    if (process.platform === 'win32') {
-        // Windows 优先使用 .ico 格式
-        iconPaths.push(
-            path.join(__dirname, 'assets/icon.ico'),
-            path.join(__dirname, 'assets/tray-icon.ico'),
-            path.join(process.resourcesPath, 'assets/icon.ico'),
-            path.join(__dirname, 'assets/icon.png'),
-            path.join(__dirname, 'assets/tray-icon.png'),
-            path.join(process.resourcesPath, 'assets/icon.png')
-        );
-    } else {
-        // macOS 和 Linux 使用 .png 格式
-        iconPaths.push(
-            path.join(__dirname, 'assets/tray-icon.png'),
-            path.join(__dirname, 'assets/icon.png'),
-            path.join(process.resourcesPath, 'assets/tray-icon.png'),
-            path.join(process.resourcesPath, 'assets/icon.png')
-        );
-    }
     
     let icon = null;
     let iconPath = null;
-    
-    // 尝试加载图标
-    for (const p of iconPaths) {
-        if (fs.existsSync(p)) {
-            try {
-                const tempIcon = nativeImage.createFromPath(p);
-                if (!tempIcon.isEmpty()) {
-                    icon = tempIcon;
-                    iconPath = p;
-                    console.log('✅ 成功加载托盘图标:', p);
-                    break;
-                }
-            } catch (error) {
-                console.warn('⚠️ 加载图标失败:', p, error.message);
-            }
-        }
-    }
+    iconPath = path.join(__dirname, 'assets/icon.png');
+    icon = nativeImage.createFromPath(iconPath);
     
     // 如果找不到图标，创建一个简单的图标（避免托盘功能完全失效）
     if (!icon || icon.isEmpty()) {
@@ -454,4 +417,5 @@ app.on('window-all-closed', () => {
 app.on('before-quit', () => {
     isQuitting = true;
 });
+
 
