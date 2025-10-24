@@ -49,83 +49,127 @@ function createWindow() {
 }
 
 function createTray() {
-    // 尝试多个图标路径（优先级从高到低）
+    // ✅ 修复：更全面的图标路径查找策略
     const iconPaths = [
-        path.join(__dirname, 'assets/tray-icon.png'),     // 专用托盘图标
-        path.join(__dirname, 'assets/icon.png'),          // 应用图标（备用）
-        path.join(process.resourcesPath, 'assets/icon.png') // 打包后路径
+        // 开发环境路径
+        path.join(__dirname, 'assets', 'tray-icon.png'),
+        path.join(__dirname, 'assets', 'icon.png'),
+        // 打包后路径 - asar.unpacked
+        path.join(__dirname, '..', 'app.asar.unpacked', 'assets', 'icon.png'),
+        // 打包后路径 - resources 目录
+        path.join(process.resourcesPath, 'assets', 'icon.png'),
+        path.join(process.resourcesPath, 'app', 'assets', 'icon.png'),
+        // 可执行文件旁边的 resources
+        path.join(path.dirname(app.getPath('exe')), 'resources', 'assets', 'icon.png'),
+        path.join(app.getAppPath(), 'assets', 'icon.png')
     ];
     
+    let icon = null;
     let iconPath = null;
+    
+    // 尝试加载图标
     for (const p of iconPaths) {
-        if (fs.existsSync(p)) {
-            iconPath = p;
-            console.log('使用图标:', p);
-            break;
+        try {
+            if (fs.existsSync(p)) {
+                const testIcon = nativeImage.createFromPath(p);
+                if (!testIcon.isEmpty()) {
+                    icon = testIcon;
+                    iconPath = p;
+                    console.log('✅ 成功加载托盘图标:', p);
+                    break;
+                }
+            }
+        } catch (error) {
+            console.log('尝试路径失败:', p, error.message);
         }
     }
     
-    if (!iconPath) {
-        console.error('❌ 找不到任何图标文件，托盘功能将不可用');
-        console.error('请确保以下任一文件存在：');
+    // ✅ 如果找不到图标文件，创建一个基本图标（而不是放弃创建托盘）
+    if (!icon || icon.isEmpty()) {
+        console.warn('⚠️ 未找到图标文件，创建基本托盘图标');
+        // 创建一个 16x16 的简单彩色方块作为备用图标
+        const canvas = document.createElement ? null : require('canvas');
+        if (canvas) {
+            const { createCanvas } = canvas;
+            const cvs = createCanvas(16, 16);
+            const ctx = cvs.getContext('2d');
+            ctx.fillStyle = '#4facfe';
+            ctx.fillRect(0, 0, 16, 16);
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(4, 4, 8, 8);
+            icon = nativeImage.createFromDataURL(cvs.toDataURL());
+        } else {
+            // 如果 canvas 不可用，使用空图标
+            icon = nativeImage.createEmpty();
+        }
+        
+        // 输出调试信息
+        console.error('❌ 找不到任何图标文件，已尝试以下路径：');
         iconPaths.forEach(p => console.error('  -', p));
-        return;
+        console.log('当前工作目录:', process.cwd());
+        console.log('__dirname:', __dirname);
+        console.log('resourcesPath:', process.resourcesPath);
+        console.log('exe 路径:', app.getPath('exe'));
     }
-    
-    // 加载图标并调整大小（适配托盘显示）
-    let icon = nativeImage.createFromPath(iconPath);
     
     // 如果图标太大，缩小到托盘合适的尺寸
-    const size = icon.getSize();
-    if (size.width > 32 || size.height > 32) {
-        icon = icon.resize({ width: 16, height: 16 });
+    if (!icon.isEmpty()) {
+        const size = icon.getSize();
+        if (size.width > 32 || size.height > 32) {
+            icon = icon.resize({ width: 16, height: 16 });
+        }
     }
     
-    tray = new Tray(icon);
-    
-    const contextMenu = Menu.buildFromTemplate([
-        {
-            label: '显示主窗口',
-            click: () => {
-                if (mainWindow) {
+    // ✅ 关键：无论如何都要创建托盘
+    try {
+        tray = new Tray(icon);
+        
+        const contextMenu = Menu.buildFromTemplate([
+            {
+                label: '显示主窗口',
+                click: () => {
+                    if (mainWindow) {
+                        mainWindow.show();
+                        mainWindow.focus();
+                    }
+                }
+            },
+            {
+                label: '添加日程',
+                click: () => {
+                    createScheduleWindow();
+                }
+            },
+            {
+                type: 'separator'
+            },
+            {
+                label: '退出',
+                click: () => {
+                    isQuitting = true;
+                    app.quit();
+                }
+            }
+        ]);
+        
+        tray.setToolTip('日程提醒助手');
+        tray.setContextMenu(contextMenu);
+        
+        tray.on('click', () => {
+            if (mainWindow) {
+                if (mainWindow.isVisible()) {
+                    mainWindow.hide();
+                } else {
                     mainWindow.show();
                     mainWindow.focus();
                 }
             }
-        },
-        {
-            label: '添加日程',
-            click: () => {
-                createScheduleWindow();
-            }
-        },
-        {
-            type: 'separator'
-        },
-        {
-            label: '退出',
-            click: () => {
-                isQuitting = true;
-                app.quit();
-            }
-        }
-    ]);
-    
-    tray.setToolTip('日程提醒助手');
-    tray.setContextMenu(contextMenu);
-    
-    tray.on('click', () => {
-        if (mainWindow) {
-            if (mainWindow.isVisible()) {
-                mainWindow.hide();
-            } else {
-                mainWindow.show();
-                mainWindow.focus();
-            }
-        }
-    });
-    
-    console.log('✅ 托盘图标创建成功');
+        });
+        
+        console.log('✅ 托盘创建成功');
+    } catch (error) {
+        console.error('❌ 托盘创建失败:', error);
+    }
 }
 
 function createScheduleWindow() {
