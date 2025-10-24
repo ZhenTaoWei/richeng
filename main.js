@@ -54,7 +54,12 @@ function createTray() {
     let iconPath = null;
     iconPath = path.join(__dirname, 'assets/icon.ico');
     icon = nativeImage.createFromPath(iconPath);
-    dialog.showErrorBox('图标加载失败', `未能从以下路径加载托盘图标：\n${iconPath}`);
+    dialog.showMessageBox({
+      type: 'info',
+      title: '调试图标路径',
+      message: '调试图标路径信息：',
+      detail: `尝试的路径：\n${iconPath.join('\n')}`
+    });
     
     // 如果找不到图标，创建一个简单的图标（避免托盘功能完全失效）
     if (!icon || icon.isEmpty()) {
@@ -403,6 +408,7 @@ app.on('window-all-closed', () => {
 app.on('before-quit', () => {
     isQuitting = true;
 });
+
 
 
 
