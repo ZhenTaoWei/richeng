@@ -37,7 +37,8 @@
       "!dist/**/*"
     ],
     "asarUnpack": [
-      "node_modules/electron-updater/**/*"
+      "node_modules/electron-updater/**/*",
+      "assets/**/*"
     ],
     "win": {
       "target": "nsis",
@@ -59,3 +60,4 @@
     }
   }
 }
+
