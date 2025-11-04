@@ -223,13 +223,30 @@
                 const result = await ipcRenderer.invoke('add-schedule', formData);
                 
                 if (result.success) {
+                    // 使用setTimeout确保在alert之后执行焦点设置
                     alert('日程添加成功！');
+                    
                     // 重置表单
                     document.getElementById('scheduleForm').reset();
                     // 重新设置默认日期和时间
                     this.setDefaultDateTime();
-                    // 将焦点设置到事项内容输入框
-                    document.getElementById('scheduleContent').focus();
+                    
+                    // 确保窗口获得焦点（Electron环境）
+                    if (window.require) {
+                        const { remote } = window.require('electron');
+                        const currentWindow = remote.getCurrentWindow();
+                        currentWindow.focus();
+                    }
+                    
+                    // 使用setTimeout延迟设置焦点，确保在DOM更新后执行
+                    setTimeout(() => {
+                        const contentInput = document.getElementById('scheduleContent');
+                        if (contentInput) {
+                            contentInput.focus();
+                            contentInput.select(); // 可选：选中输入框内容
+                        }
+                    }, 100);
+                    
                     // 重新加载日程数据以更新冲突检查
                     await this.loadSchedules();
                 }
