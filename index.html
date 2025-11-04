@@ -114,7 +114,7 @@
             border-radius: 15px;
             padding: 25px;
             box-shadow: 0 5px 15px rgba(0,0,0,0.1);
-            height: calc(100vh - 120px); /* 固定高度，减去顶部和底部的边距 */
+            height: calc(100vh - 120px); /* 固定高度，增加底部边距确保完整显示 */
             overflow-y: auto; /* 垂直滚动 */
             box-sizing: border-box; /* 确保padding不影响最终高度 */
         }
@@ -342,7 +342,28 @@
         </div>
     </div>
 
+    <div id="toast" style="
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        background: rgba(0,0,0,0.7);
+        color: #fff;
+        padding: 12px 20px;
+        border-radius: 6px;
+        opacity: 0;
+        transition: opacity 0.3s;
+        z-index: 9999;
+    "></div>
     <script>
+        function showToast(message, duration = 2000) {
+            const toast = document.getElementById('toast');
+            toast.textContent = message;
+            toast.style.opacity = '1';
+            setTimeout(() => {
+                toast.style.opacity = '0';
+            }, duration);
+        }
+
         const { ipcRenderer } = require('electron');
 
         class ScheduleApp {
@@ -368,14 +389,14 @@
                         try {
                             const result = await ipcRenderer.invoke('clear-all-schedules');
                             if (result.success) {
-                                alert('所有日程已清空！');
+                                showToast('所有日程已清空！');
                                 await this.loadSchedules(); // 重新加载日程（此时应该为空）
                             } else {
-                                alert('清空失败：' + (result.error || '未知错误'));
+                                showToast('清空失败：' + (result.error || '未知错误'));
                             }
                         } catch (error) {
                             console.error('清空日程时出错:', error);
-                            alert('清空日程时发生错误');
+                            showToast('清空日程时发生错误');
                         }
                     }
                 });
@@ -416,28 +437,65 @@
                 }, 30000);
             }
 
+            checkConflict(newSchedule) {
+                // 过滤时只考虑未完成的日程
+                const activeSchedules = this.schedules.filter(schedule => !schedule.completed);
+                
+                // 检查是否有时间冲突
+                return activeSchedules.some(schedule => {
+                    // 如果日期不同，则不冲突
+                    if (schedule.date !== newSchedule.date) return false;
+                    
+                    // 检查时间范围是否重叠
+                    // 新日程的结束时间 <= 已有日程的开始时间，或新日程的开始时间 >= 已有日程的结束时间，则不冲突
+                    // 否则冲突
+                    return !(newSchedule.endTime <= schedule.startTime || newSchedule.startTime >= schedule.endTime);
+                });
+            }
+            
             async handleSubmit(e) {
                 e.preventDefault();
                 
+                const date = document.getElementById('quickDate').value;
+                const startTime = document.getElementById('quickStartTime').value;
+                const endTime = document.getElementById('quickEndTime').value;
+                
+                // 验证开始时间不能早于当前时间
+                const now = new Date();
+                const scheduleDateTime = new Date(`${date}T${startTime}`);
+                
+                // 如果是今天，检查时间是否已过
+                if (date === now.toISOString().split('T')[0] && scheduleDateTime < now) {
+                    showToast('⚠️ 开始时间不能早于当前时间！请选择一个未来的时间。');
+                    return;
+                }
+                
                 const formData = {
                     id: Date.now(),
-                    date: document.getElementById('quickDate').value,
-                    startTime: document.getElementById('quickStartTime').value,
-                    endTime: document.getElementById('quickEndTime').value,
+                    date: date,
+                    startTime: startTime,
+                    endTime: endTime,
                     content: document.getElementById('quickContent').value.trim(),
                     completed: false,
                     createdAt: new Date().toISOString()
                 };
 
-                if (formData.startTime >= formData.endTime) {
-                    alert('结束时间必须晚于开始时间！');
+                if (formData.startTime > formData.endTime) {
+                    showToast('结束时间必须晚于开始时间！');
+                    return;
+                }
+                
+                // 检查是否存在时间冲突
+                const hasConflict = this.checkConflict(formData);
+                if (hasConflict) {
+                    showToast('⚠️ 存在时间冲突，无法添加此日程！请调整时间后重试。');
                     return;
                 }
 
                 const result = await ipcRenderer.invoke('add-schedule', formData);
                 
                 if (result.success) {
-                    alert('日程添加成功！');
+                    showToast('日程添加成功！');
                     document.getElementById('quickAddForm').reset();
                     this.setDefaultDateTime();
                     await this.loadSchedules();
@@ -584,4 +642,3 @@
     </script>
 </body>
 </html>
-
