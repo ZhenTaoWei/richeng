@@ -16,6 +16,7 @@
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             min-height: 100vh;
             padding: 20px;
+            overflow: hidden; /* 防止整个页面滚动 */
         }
 
         .container {
@@ -109,9 +110,32 @@
         }
 
         .schedule-list {
-            background: #f8f9fa;
+            background: white;
             border-radius: 15px;
             padding: 25px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+            height: calc(100vh - 80px); /* 固定高度，减去顶部和底部的边距 */
+            overflow-y: auto; /* 垂直滚动 */
+            box-sizing: border-box; /* 确保padding不影响最终高度 */
+        }
+        
+        /* 自定义滚动条样式 */
+        .schedule-list::-webkit-scrollbar {
+            width: 8px;
+        }
+        
+        .schedule-list::-webkit-scrollbar-track {
+            background: #f1f1f1;
+            border-radius: 4px;
+        }
+        
+        .schedule-list::-webkit-scrollbar-thumb {
+            background: #888;
+            border-radius: 4px;
+        }
+        
+        .schedule-list::-webkit-scrollbar-thumb:hover {
+            background: #555;
         }
 
         .schedule-item {
@@ -285,7 +309,12 @@
             </div>
 
             <div class="schedule-list">
-                <h2>📋 即将开始的日程</h2>
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                    <h2>📋 即将开始的日程</h2>
+                    <button id="clearAllBtn" class="btn btn-secondary" style="background: #6c757d; padding: 8px 16px; font-size: 0.9em;">
+                        🗑️ 清空所有
+                    </button>
+                </div>
                 
                 <div class="stats">
                     <div class="stat-card">
@@ -332,6 +361,24 @@
             bindEvents() {
                 const form = document.getElementById('quickAddForm');
                 form.addEventListener('submit', (e) => this.handleSubmit(e));
+                
+                // 添加清空按钮事件监听
+                document.getElementById('clearAllBtn').addEventListener('click', async () => {
+                    if (confirm('确定要清空所有日程吗？此操作不可撤销！')) {
+                        try {
+                            const result = await ipcRenderer.invoke('clear-all-schedules');
+                            if (result.success) {
+                                alert('所有日程已清空！');
+                                await this.loadSchedules(); // 重新加载日程（此时应该为空）
+                            } else {
+                                alert('清空失败：' + (result.error || '未知错误'));
+                            }
+                        } catch (error) {
+                            console.error('清空日程时出错:', error);
+                            alert('清空日程时发生错误');
+                        }
+                    }
+                });
             }
 
             setDefaultDateTime() {
@@ -413,7 +460,7 @@
                 }
 
                 let html = '';
-                upcomingSchedules.slice(0, 5).forEach(schedule => {
+                upcomingSchedules.forEach(schedule => {
                     const isUpcoming = this.isUpcoming(schedule);
                     
                     html += `
@@ -452,10 +499,9 @@
                     if (schedule.completed) return false; // ✅ 排除已完成的日程
                     
                     const scheduleDateTime = new Date(`${schedule.date}T${schedule.startTime}`);
-                    const timeDiff = scheduleDateTime - now;
                     
-                    // 显示未来7天内的日程
-                    return timeDiff > 0 && timeDiff <= 7 * 24 * 60 * 60 * 1000;
+                    // 显示所有未来的日程（移除7天限制）
+                    return scheduleDateTime > now;
                 }).sort((a, b) => {
                     const dateA = new Date(`${a.date}T${a.startTime}`);
                     const dateB = new Date(`${b.date}T${b.startTime}`);
