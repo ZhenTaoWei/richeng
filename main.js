@@ -231,6 +231,16 @@ class ScheduleReminder {
         this.saveSchedules();
     }
 
+    clearAllSchedules() {
+        // 停止所有提醒
+        for (const id of this.reminderIntervals.keys()) {
+            this.stopReminder(id);
+        }
+        // 清空所有日程
+        this.schedules = [];
+        this.saveSchedules();
+    }
+
     startAllReminders() {
         this.schedules.forEach(schedule => {
             if (!schedule.completed) {
@@ -364,6 +374,16 @@ ipcMain.handle('delete-schedule', (event, id) => {
     return { success: true };
 });
 
+ipcMain.handle('clear-all-schedules', () => {
+    try {
+        reminder.clearAllSchedules();
+        return { success: true };
+    } catch (error) {
+        console.error('清空日程失败:', error);
+        return { success: false, error: error.message };
+    }
+});
+
 ipcMain.handle('get-upcoming-schedules', () => {
     return reminder.getUpcomingSchedules();
 });
@@ -409,14 +429,5 @@ app.on('window-all-closed', () => {
 app.on('before-quit', () => {
     isQuitting = true;
 });
-
-
-
-
-
-
-
-
-
 
 
