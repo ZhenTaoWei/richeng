@@ -346,7 +346,7 @@
         position: fixed;
         top: 20px;
         right: 20px;
-        background: rgba(0,0,0,0.7);
+        background: rgba(0, 0, 0, 0.7);
         color: #fff;
         padding: 12px 20px;
         border-radius: 6px;
@@ -418,8 +418,8 @@
                 const startTime = `${String(nextHour).padStart(2, '0')}:00`;
                 document.getElementById('quickStartTime').value = startTime;
                 
-                // 设置结束时间为开始时间+1小时
-                const endHour = (nextHour + 1) % 24;
+                // 设置结束时间为开始时间小时
+                const endHour = nextHour;
                 const endTime = `${String(endHour).padStart(2, '0')}:00`;
                 document.getElementById('quickEndTime').value = endTime;
             }
@@ -465,7 +465,7 @@
                 const scheduleDateTime = new Date(`${date}T${startTime}`);
                 
                 // 如果是今天，检查时间是否已过
-                if (date === now.toISOString().split('T')[0] && scheduleDateTime < now) {
+                if (date === now.toISOString().split('T')[0] && scheduleDateTime < now || date < now.toISOString().split('T')[0]) {
                     showToast('⚠️ 开始时间不能早于当前时间！请选择一个未来的时间。');
                     return;
                 }
@@ -572,8 +572,8 @@
                 const scheduleDateTime = new Date(`${schedule.date}T${schedule.startTime}`);
                 const timeDiff = scheduleDateTime - now;
                 
-                // 30分钟内开始的日程标记为"即将开始"
-                return timeDiff > 0 && timeDiff <= 30 * 60 * 1000;
+                // 2小时内开始的日程标记为"即将开始"
+                return timeDiff > 0 && timeDiff <= 2 * 60 * 60 * 1000;
             }
 
             updateStats() {
@@ -582,11 +582,13 @@
                 // ✅ 修复：统计时排除已完成的日程
                 const activeSchedules = this.schedules.filter(s => !s.completed);
                 const todaySchedules = activeSchedules.filter(s => s.date === today);
-                const upcomingSchedules = this.getUpcomingSchedules();
+                
+                // 只统计2小时内开始的即将开始日程
+                const upcomingSoonSchedules = activeSchedules.filter(s => this.isUpcoming(s));
 
                 document.getElementById('totalCount').textContent = activeSchedules.length;
                 document.getElementById('todayCount').textContent = todaySchedules.length;
-                document.getElementById('upcomingCount').textContent = upcomingSchedules.length;
+                document.getElementById('upcomingCount').textContent = upcomingSoonSchedules.length;
             }
 
             async toggleComplete(id) {
