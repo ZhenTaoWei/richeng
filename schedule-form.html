@@ -184,11 +184,32 @@
             async handleSubmit(e) {
                 e.preventDefault();
                 
+                // 主动检查是否存在时间冲突
+                const hasConflict = this.checkConflict();
+                if (hasConflict) {
+                    alert('⚠️ 存在时间冲突，无法添加此日程！请调整时间后重试。');
+                    return;
+                }
+                
+                const date = document.getElementById('scheduleDate').value;
+                const startTime = document.getElementById('startTime').value;
+                const endTime = document.getElementById('endTime').value;
+                
+                // 验证开始时间不能早于当前时间
+                const now = new Date();
+                const scheduleDateTime = new Date(`${date}T${startTime}`);
+                
+                // 如果是今天，检查时间是否已过
+                if (date === now.toISOString().split('T')[0] && scheduleDateTime < now) {
+                    alert('⚠️ 开始时间不能早于当前时间！请选择一个未来的时间。');
+                    return;
+                }
+                
                 const formData = {
                     id: Date.now(),
-                    date: document.getElementById('scheduleDate').value,
-                    startTime: document.getElementById('startTime').value,
-                    endTime: document.getElementById('endTime').value,
+                    date: date,
+                    startTime: startTime,
+                    endTime: endTime,
                     content: document.getElementById('scheduleContent').value.trim(),
                     completed: false,
                     createdAt: new Date().toISOString()
@@ -198,12 +219,19 @@
                     alert('结束时间必须晚于开始时间！');
                     return;
                 }
-
+                
                 const result = await ipcRenderer.invoke('add-schedule', formData);
                 
                 if (result.success) {
                     alert('日程添加成功！');
-                    window.close();
+                    // 重置表单
+                    document.getElementById('scheduleForm').reset();
+                    // 重新设置默认日期和时间
+                    this.setDefaultDateTime();
+                    // 将焦点设置到事项内容输入框
+                    document.getElementById('scheduleContent').focus();
+                    // 重新加载日程数据以更新冲突检查
+                    await this.loadSchedules();
                 }
             }
 
@@ -212,13 +240,14 @@
                 const startTime = document.getElementById('startTime').value;
                 const endTime = document.getElementById('endTime').value;
                 
-                if (!date || !startTime || !endTime) return;
+                if (!date || !startTime || !endTime) return false;
 
                 // ✅ 修改：过滤时只考虑未完成的日程
                 const conflicts = this.schedules.filter(schedule => {
                     if (schedule.date !== date) return false;
                     if (schedule.completed) return false; // ✅ 排除已完成的日程
                     
+                    // 时间冲突判断：新日程的开始时间小于现有日程的结束时间，且新日程的结束时间大于现有日程的开始时间
                     return (startTime < schedule.endTime && endTime > schedule.startTime);
                 });
 
@@ -230,8 +259,10 @@
                         `• ${this.formatTime(c.startTime)}-${this.formatTime(c.endTime)}: ${c.content}`
                     ).join('<br>');
                     warningDiv.style.display = 'block';
+                    return true; // 存在冲突
                 } else {
                     warningDiv.style.display = 'none';
+                    return false; // 不存在冲突
                 }
             }
 
